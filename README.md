@@ -1,7 +1,16 @@
 # homeback.koplugin — Home button as Back
 
-A tiny [KOReader](https://koreader.rocks) plugin that makes the physical
-**Home** button act as the **Back** key:
+A tiny [KOReader](https://koreader.rocks) plugin with two fixes for devices
+with physical buttons, written for the PocketBook Era Lite:
+
+1. the physical **Home** button acts as the **Back** key;
+2. the **page-turn buttons follow the screen rotation** on devices where
+   the firmware does not swap them (the Era Lite).
+
+Both are done at runtime, in KOReader's input tables, so no KOReader file is
+edited and the changes survive KOReader updates.
+
+## Home button as Back
 
 | Where | What Home does with the plugin |
 |---|---|
@@ -9,14 +18,25 @@ A tiny [KOReader](https://koreader.rocks) plugin that makes the physical
 | Menus and dialogs | closes them, or steps back to the parent menu |
 | Reader | whatever *Settings → Navigation → Back in reader* is set to (previous location, file browser, …) |
 
-It was written for the PocketBook Era Lite, where KOReader has no key bound
-to Back and getting out of a deep folder means paging back to the top
+On the Era Lite KOReader has no key bound to Back, so getting out of a deep
+folder means paging back to the top
 (see [koreader/koreader#14058](https://github.com/koreader/koreader/issues/14058)).
 It should work on any device whose KOReader event map has a `Home` key
 (other PocketBooks, Kobo, Kindle), but only PocketBook has been tested.
 
-The remap is done at runtime, in KOReader's input event map, so no KOReader
-file is edited and the change survives KOReader updates.
+## Page-turn buttons follow rotation
+
+When the screen is rotated, KOReader normally swaps the page-turn (and
+cursor) keys so that "top button = back" stays true. On the Era Lite the
+device layer tells KOReader that the firmware does the swapping, which it
+does not, so after a 180° flip the buttons keep their upright meaning
+(see [koreader/koreader#15909](https://github.com/koreader/koreader/issues/15909)).
+The plugin restores KOReader's standard key rotation map, so the buttons
+follow the screen in every orientation.
+
+This is **on by default only on the Era Lite (PB710)**. On any other device
+with buttons it is available as a toggle but off: if the firmware already
+swaps the buttons, enabling it would swap them twice.
 
 ## Install
 
@@ -31,13 +51,17 @@ file is edited and the change survives KOReader updates.
    equivalent in your firmware version; the long press keeps its firmware
    function). Without this the firmware handles the button itself and
    KOReader never sees it. This was required on the Era Lite.
-3. Restart KOReader. The plugin is enabled by default.
+3. Restart KOReader. Both fixes are enabled by default on the Era Lite.
 
 ## Settings
 
-*Settings → Navigation → Home button acts as Back* (both in the file browser
-and in the reader) toggles the remap. Turning it off restores the normal
-Home behaviour at once; the help text of the item repeats this.
+Both toggles live under *Settings → Navigation*, in the file browser and in
+the reader, and act at once:
+
+- **Home button acts as Back** (default on). Off restores the normal Home
+  behaviour.
+- **Page-turn buttons follow rotation** (default on for the Era Lite, off
+  elsewhere). Off restores the device's own rotation map.
 
 ## How it works
 
@@ -50,6 +74,14 @@ widget that handles Back — file chooser, menus, dialogs, the reader's Back
 module — gets the press, including dialogs stacked on top of the current
 screen.
 
+After that lookup, `input.lua` passes the key name through
+`Device.input.rotation_map[<current rotation>]`. Devices flagged with
+`inkview_translates_buttons` get an empty map from
+`Input:disableRotationMap()`; the plugin replaces it with the standard map
+that `Input:init()` builds for every other device (the same table as the
+user patch from the issue above), and keeps the device's own map so the
+toggle can put it back.
+
 ### Alternative without a plugin
 
 KOReader can also load a user key map from `koreader/settings/event_map.lua`
@@ -59,17 +91,19 @@ at start-up. A file containing
 return { [-26] = "Back" }
 ```
 
-does the same remap permanently (no toggle); the settings folder survives
-updates too. The plugin exists for the menu toggle and for devices with a
-different Home key code.
+does the Home remap permanently (no toggle); the settings folder survives
+updates too. The rotation fix has no settings-file equivalent, but it can be
+done with a user patch in `koreader/patches/` as shown in the issue.
 
 ## Troubleshooting
 
 - Nothing happens when pressing Home on a PocketBook: check step 2 above.
+- Page-turn buttons swap twice after rotating: your device swaps them in
+  firmware already; turn *Page-turn buttons follow rotation* off.
 - Lines starting with `HomeBack:` in `koreader/crash.log` show which key
-  codes were found and what they were set to. "This device has no Home key
-  in its event map" means the device layer names the key differently; please
-  open an issue with your device model.
+  codes were found, what they were set to, and which rotation map is active.
+  "This device has no Home key in its event map" means the device layer
+  names the key differently; please open an issue with your device model.
 
 ## License
 
