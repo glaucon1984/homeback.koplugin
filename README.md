@@ -1,14 +1,16 @@
 # homeback.koplugin — Home button as Back
 
-A tiny [KOReader](https://koreader.rocks) plugin with two fixes for devices
-with physical buttons, written for the PocketBook Era Lite:
+A tiny [KOReader](https://koreader.rocks) plugin with three fixes written
+for the PocketBook Era Lite:
 
 1. the physical **Home** button acts as the **Back** key;
 2. the **page-turn buttons follow the screen rotation** on devices where
-   the firmware does not swap them (the Era Lite).
+   the firmware does not swap them (the Era Lite);
+3. the **screen is not upside down when KOReader is started upside down**,
+   and books come up the way the device is held (Era, Era Color, Era Lite).
 
-Both are done at runtime, in KOReader's input tables, so no KOReader file is
-edited and the changes survive KOReader updates.
+All three are done at runtime (KOReader's input tables, InkView calls), so no
+KOReader file is edited and the changes survive KOReader updates.
 
 ## Home button as Back
 
@@ -38,6 +40,37 @@ This is **on by default only on the Era Lite (PB710)**. On any other device
 with buttons it is available as a toggle but off: if the firmware already
 swaps the buttons, enabling it would swap them twice.
 
+## Fix orientation when started upside down
+
+If KOReader is started while the device is held upside down (buttons on the
+left), everything is shown upside down, and turning the device does not put
+it right: every flip is applied on top of a wrong starting orientation. Only
+putting the device to sleep and waking it fixes it (see
+[koreader/koreader#15370](https://github.com/koreader/koreader/issues/15370)
+and [#16074](https://github.com/koreader/koreader/issues/16074)). A book
+also always opens with the rotation it was last closed with, whichever way
+the device is held now, and needs a flip to catch up.
+
+The plugin folds the firmware's offset into KOReader's own rotation, and
+brings KOReader's rotation in line with the G-sensor every time the file
+browser or a book is opened. It is **on by default on the PocketBook devices
+KOReader already re-syncs after resume** (Era, Era Color, Era Lite) and
+available on any other PocketBook with a G-sensor. KOReader's own rotation
+settings are honoured: with *Ignore accelerometer rotation events* on,
+KOReader's rotation is left alone; with *Lock auto rotation to current
+orientation* on, only a portrait↔portrait or landscape↔landscape correction
+is applied.
+
+Three modes are selectable, in case a firmware behaves differently:
+
+- **Compensate the firmware's offset** (default): the fix described above,
+  tested on an Era Lite with firmware 6.11.
+- **Reset InkView to upright**: asks the firmware to show the task upright
+  (`SetOrientation(0)`) and then syncs KOReader with the sensor. On the Era
+  Lite the firmware accepts the call but the picture does not change.
+- **Off (log only)**: writes what the firmware reports to `crash.log` and
+  changes nothing.
+
 ## Install
 
 1. Download `homeback.koplugin.zip` from the
@@ -51,17 +84,20 @@ swaps the buttons, enabling it would swap them twice.
    equivalent in your firmware version; the long press keeps its firmware
    function). Without this the firmware handles the button itself and
    KOReader never sees it. This was required on the Era Lite.
-3. Restart KOReader. Both fixes are enabled by default on the Era Lite.
+3. Restart KOReader. All three fixes are enabled by default on the Era Lite.
 
 ## Settings
 
-Both toggles live under *Settings → Navigation*, in the file browser and in
-the reader, and act at once:
+The toggles are available in the file browser and in the reader:
 
-- **Home button acts as Back** (default on). Off restores the normal Home
-  behaviour.
-- **Page-turn buttons follow rotation** (default on for the Era Lite, off
-  elsewhere). Off restores the device's own rotation map.
+- *Settings → Navigation* → **Home button acts as Back** (default on). Off
+  restores the normal Home behaviour. Acts at once.
+- *Settings → Navigation* → **Page-turn buttons follow rotation** (default on
+  for the Era Lite, off elsewhere). Off restores the device's own rotation
+  map. Acts at once.
+- *Settings → Screen → Rotation* → **Fix orientation when started upside
+  down** (default *Compensate* for the Era, Era Color and Era Lite, *Off* on
+  other PocketBooks). Takes effect at the next start.
 
 ## How it works
 
@@ -82,6 +118,35 @@ that `Input:init()` builds for every other device (the same table as the
 user patch from the issue above), and keeps the device's own map so the
 toggle can put it back.
 
+On PocketBook, KOReader draws into InkView's task framebuffer and does all
+the rotation itself in software, so it relies on that buffer being shown
+upright. When KOReader starts while the device is held upside down, the
+firmware shows the task turned 180° (InkView reports app orientation 3 for
+it) and everything KOReader draws is shown turned a further 180°. Neither
+`iv_update_orientation()` (what KOReader's own resume sync calls) nor the
+public `SetOrientation(0)` removes that offset on the Era Lite, although
+`GetOrientation()` then reports 0.
+
+So the plugin does not fight the firmware. Whenever InkView reports app
+orientation 3, it sets KOReader's framebuffer `native_rotation_mode` to
+"upside down" and re-applies the current rotation mode, so the offset is
+folded into KOReader's own blitbuffer rotation; touch coordinates, which
+InkView already translates for its orientation, get the matching
+`getTouchRotation` override. Then it feeds the current
+`GetGSensorOrientation()` through KOReader's gyro handler (`handleMiscGyroEv`
+directly, because `handleGyroEv` is voided while input is inhibited, which is
+the case while a book loads) so KOReader's rotation matches the way the
+device is held. This runs on every plugin instance, i.e. on every file
+browser and reader open, on the tick after the screen has applied its own
+saved rotation, and again after resume.
+
+When KOReader is started by the firmware to open a book (file association),
+no orientation events reach KOReader at all: the firmware turns the task
+itself as the device is flipped, and InkView's app orientation changes under
+KOReader. The plugin therefore polls `GetOrientation()` every two seconds
+(paused during sleep) and, on a change, re-folds the offset and rotates
+KOReader to the new value.
+
 ### Alternative without a plugin
 
 KOReader can also load a user key map from `koreader/settings/event_map.lua`
@@ -100,6 +165,13 @@ done with a user patch in `koreader/patches/` as shown in the issue.
 - Nothing happens when pressing Home on a PocketBook: check step 2 above.
 - Page-turn buttons swap twice after rotating: your device swaps them in
   firmware already; turn *Page-turn buttons follow rotation* off.
+- The screen is still upside down: `koreader/crash.log` has a
+  `HomeBack: startup ... InkView app N global N G-sensor N KOReader rotation N`
+  line per start, a `HomeBack: gyro event` line per sensor event, and
+  `HomeBack: InkView app orientation changed` lines when the firmware turns
+  the task itself. "no usable G-sensor orientation" means the sensor is off
+  in the PocketBook settings or the firmware does not report it. Please open
+  an issue with those lines and your device model and firmware.
 - Lines starting with `HomeBack:` in `koreader/crash.log` show which key
   codes were found, what they were set to, and which rotation map is active.
   "This device has no Home key in its event map" means the device layer
