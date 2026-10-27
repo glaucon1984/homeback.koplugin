@@ -102,6 +102,23 @@ local function standardRotationMap()
     }
 end
 
+-- The firmware does swap the buttons when its *own* app orientation is not
+-- upright, which is the case when KOReader is started upside down (see the
+-- orientation fix below, which folds that offset into the framebuffer's
+-- native rotation). So KOReader must only swap for the rotation it does in
+-- software: the current mode relative to that offset, as with touch.
+local function relativeRotationMap()
+    local map = standardRotationMap()
+    return setmetatable({}, {
+        __index = function(_, rota)
+            local fb = Device.screen
+            local native = fb.native_rotation_mode or 0
+            local offset = native - (fb._homeback_orig_native or native)
+            return map[(4 + rota - offset) % 4] or map[0]
+        end,
+    })
+end
+
 -- Devices whose device layer disables KOReader's rotation map although the
 -- firmware does not swap the buttons itself.
 local function rotationDefault()
@@ -126,7 +143,7 @@ local function applyRotation(enabled)
     if not input._homeback_rotation_map then
         input._homeback_rotation_map = input.rotation_map
     end
-    input.rotation_map = enabled and standardRotationMap() or input._homeback_rotation_map
+    input.rotation_map = enabled and relativeRotationMap() or input._homeback_rotation_map
     logger.info("HomeBack: page-turn buttons", enabled and "follow the screen rotation" or "use the device's own rotation map")
     return true
 end

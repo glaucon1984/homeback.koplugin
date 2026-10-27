@@ -34,7 +34,10 @@ device layer tells KOReader that the firmware does the swapping, which it
 does not, so after a 180° flip the buttons keep their upright meaning
 (see [koreader/koreader#15909](https://github.com/koreader/koreader/issues/15909)).
 The plugin restores KOReader's standard key rotation map, so the buttons
-follow the screen in every orientation.
+follow the screen in every orientation. The firmware *does* swap the buttons
+when its own task orientation is not upright, which is the case after an
+upside-down start (next section), so the map only swaps for the rotation
+KOReader does in software.
 
 This is **on by default only on the Era Lite (PB710)**. On any other device
 with buttons it is available as a toggle but off: if the firmware already
@@ -132,7 +135,9 @@ orientation 3, it sets KOReader's framebuffer `native_rotation_mode` to
 "upside down" and re-applies the current rotation mode, so the offset is
 folded into KOReader's own blitbuffer rotation; touch coordinates, which
 InkView already translates for its orientation, get the matching
-`getTouchRotation` override. Then it feeds the current
+`getTouchRotation` override, and the key rotation map (fix 2) is looked up
+by the same relative rotation, because InkView swaps the page-turn buttons
+itself at app orientation 3. Then it feeds the current
 `GetGSensorOrientation()` through KOReader's gyro handler (`handleMiscGyroEv`
 directly, because `handleGyroEv` is voided while input is inhibited, which is
 the case while a book loads) so KOReader's rotation matches the way the
@@ -165,6 +170,8 @@ done with a user patch in `koreader/patches/` as shown in the issue.
 - Nothing happens when pressing Home on a PocketBook: check step 2 above.
 - Page-turn buttons swap twice after rotating: your device swaps them in
   firmware already; turn *Page-turn buttons follow rotation* off.
+- Page-turn buttons are wrong only after an upside-down start: that was
+  v0.3.0 (double swap with the firmware); update to v0.3.1 or later.
 - The screen is still upside down: `koreader/crash.log` has a
   `HomeBack: startup ... InkView app N global N G-sensor N KOReader rotation N`
   line per start, a `HomeBack: gyro event` line per sensor event, and
