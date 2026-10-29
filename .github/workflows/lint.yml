@@ -22,5 +22,5 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           tag="${GITHUB_REF#refs/tags/v}"
-          meta=$(sed -n 's/.*version = "\([^"]*\)".*/\1/p' homeback.koplugin/_meta.lua)
+          meta=$(sed -n 's/.*version = "\([^"]*\)".*/\1/p' pbfixes.koplugin/_meta.lua)
           test "$tag" = "$meta" || { echo "tag v$tag != _meta.lua version $meta"; exit 1; }

@@ -1,7 +1,8 @@
-# homeback.koplugin — Home button as Back
+# pbfixes.koplugin — PocketBook fixes for KOReader
 
 A tiny [KOReader](https://koreader.rocks) plugin with three fixes written
-for the PocketBook Era Lite:
+for the PocketBook Era Lite (until v0.3.1 it was called `homeback.koplugin`,
+see [Upgrading](#upgrading-from-homebackkoplugin)):
 
 1. the physical **Home** button acts as the **Back** key;
 2. the **page-turn buttons follow the screen rotation** on devices where
@@ -76,10 +77,10 @@ Three modes are selectable, in case a firmware behaves differently:
 
 ## Install
 
-1. Download `homeback.koplugin.zip` from the
-   [latest release](https://github.com/glaucon1984/homeback.koplugin/releases/latest)
+1. Download `pbfixes.koplugin.zip` from the
+   [latest release](https://github.com/glaucon1984/pbfixes.koplugin/releases/latest)
    and unzip it into `koreader/plugins/` on the device, so that
-   `koreader/plugins/homeback.koplugin/main.lua` exists
+   `koreader/plugins/pbfixes.koplugin/main.lua` exists
    (on a PocketBook that is `applications/koreader/plugins/`).
 2. **PocketBook only:** the firmware must let the Home press reach KOReader.
    In the PocketBook's own settings, set the Home button's **short press
@@ -88,6 +89,16 @@ Three modes are selectable, in case a firmware behaves differently:
    function). Without this the firmware handles the button itself and
    KOReader never sees it. This was required on the Era Lite.
 3. Restart KOReader. All three fixes are enabled by default on the Era Lite.
+
+### Upgrading from homeback.koplugin
+
+The plugin was called `homeback.koplugin` up to v0.3.1. Unzip the new
+folder as above, then **delete `koreader/plugins/homeback.koplugin`** and
+restart KOReader. While both folders are installed the new plugin does
+nothing and shows a message asking for the old one to be removed (both
+would patch the same key tables and swap the page-turn buttons twice). Your
+toggles are carried over to the new plugin's settings on its first start.
+The old GitHub address redirects here.
 
 ## Settings
 
@@ -172,14 +183,16 @@ done with a user patch in `koreader/patches/` as shown in the issue.
   firmware already; turn *Page-turn buttons follow rotation* off.
 - Page-turn buttons are wrong only after an upside-down start: that was
   v0.3.0 (double swap with the firmware); update to v0.3.1 or later.
+- Nothing works after upgrading from `homeback.koplugin`: the old folder is
+  probably still in `koreader/plugins/`; delete it and restart.
 - The screen is still upside down: `koreader/crash.log` has a
-  `HomeBack: startup ... InkView app N global N G-sensor N KOReader rotation N`
-  line per start, a `HomeBack: gyro event` line per sensor event, and
-  `HomeBack: InkView app orientation changed` lines when the firmware turns
+  `PBFixes: startup ... InkView app N global N G-sensor N KOReader rotation N`
+  line per start, a `PBFixes: gyro event` line per sensor event, and
+  `PBFixes: InkView app orientation changed` lines when the firmware turns
   the task itself. "no usable G-sensor orientation" means the sensor is off
   in the PocketBook settings or the firmware does not report it. Please open
   an issue with those lines and your device model and firmware.
-- Lines starting with `HomeBack:` in `koreader/crash.log` show which key
+- Lines starting with `PBFixes:` in `koreader/crash.log` show which key
   codes were found, what they were set to, and which rotation map is active.
   "This device has no Home key in its event map" means the device layer
   names the key differently; please open an issue with your device model.
